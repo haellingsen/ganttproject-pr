@@ -128,7 +128,8 @@ internal interface ITaskActivitySplitter<T : IdentifiableRow> {
 
 internal class DependencySceneTaskApi(
   private val taskList: List<ITask>,
-  private val splitter: ITaskActivitySplitter<ITask>) : DependencySceneBuilder.TaskApi<ITask, BarChartConnectorImpl> {
+  private val splitter: ITaskActivitySplitter<ITask>,
+  private val selectedTaskIds: Set<Int> = emptySet()) : DependencySceneBuilder.TaskApi<ITask, BarChartConnectorImpl> {
   override fun isMilestone(task: ITask): Boolean {
     return task.isMilestone()
   }
@@ -148,8 +149,16 @@ internal class DependencySceneTaskApi(
   }
 
   override fun getStyle(dependency: BarChartConnectorImpl): String? {
-    return if (dependency.dependency.hardness === TaskDependency.Hardness.STRONG) "dependency.line.hard" else "dependency.line.rubber"
+    val base = if (dependency.dependency.hardness === TaskDependency.Hardness.STRONG) "dependency.line.hard" else "dependency.line.rubber"
+    // A dependency which touches a selected task is drawn in its own style, so that the links of
+    // the task the user is looking at stand out from the rest of the chart.
+    return if (isSelected(dependency)) "$base.selected" else base
   }
+
+  private fun isSelected(dependency: BarChartConnectorImpl) =
+    selectedTaskIds.isNotEmpty()
+      && (selectedTaskIds.contains(dependency.dependency.start.owner.rowId)
+          || selectedTaskIds.contains(dependency.dependency.end.owner.rowId))
 
   override fun getConnectors(task: ITask): Iterable<BarChartConnectorImpl>? {
     val deps = task.dependencies

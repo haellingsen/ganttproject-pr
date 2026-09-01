@@ -203,6 +203,10 @@ public class ProjectCalendarOptionPageProvider extends OptionPageProviderBase {
 
   @Override
   public void commit() {
+    if (myWeekendsPanel == null) {
+      // The dialog commits every page, and a page which the user did not open was never built.
+      return;
+    }
     myWeekendsPanel.applyChanges(false);
     myProjectStartOption.commit();
   }

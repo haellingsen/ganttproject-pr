@@ -126,6 +126,10 @@ public class PertChartAbstraction {
       return this.type;
     }
 
+    Task getTask() {
+      return myTask;
+    }
+
     void addSuccessor(TaskGraphNode successor) {
       this.successors.add(successor);
     }

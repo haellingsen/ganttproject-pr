@@ -157,23 +157,14 @@ abstract class BaseTreeTableComponent<NodeType, BuiltinColumnType: BuiltinColumn
         }
       }
       event.whenMatches("tree.expandAll") {
-        val focusedCell = treeTable.focusModel.focusedCell ?: return@whenMatches
-        keepSelection(keepFocus = true) {
-          focusedCell.treeItem.isExpanded = true
-          focusedCell.treeItem.depthFirstWalk {
-            it.isExpanded = true
-            return@depthFirstWalk true
-          }
-        }
+        expandSubtrees(isExpanded = true)
       }
       event.whenMatches("tree.collapseAll") {
-        val focusedCell = treeTable.focusModel.focusedCell ?: return@whenMatches
-        keepSelection(keepFocus = true) {
-          focusedCell.treeItem.depthFirstWalk {
-            it.isExpanded = false
-            return@depthFirstWalk true
-          }
-          focusedCell.treeItem.isExpanded = false
+        expandSubtrees(isExpanded = false)
+      }
+      for (level in 1..MAX_OUTLINE_LEVEL) {
+        event.whenMatches("tree.expandLevel$level") {
+          expandToLevel(level)
         }
       }
     }
@@ -238,7 +229,52 @@ abstract class BaseTreeTableComponent<NodeType, BuiltinColumnType: BuiltinColumn
   protected fun keepSelection(keepFocus: Boolean = false, code: () -> Unit) {
     selectionKeeper.keepSelection(keepFocus, code)
   }
+
+  /**
+   * The rows which the expand and collapse actions work on: the selected rows, or the whole tree
+   * when nothing is selected.
+   */
+  private fun expandScope(): List<TreeItem<NodeType>> =
+    treeTable.selectionModel.selectedItems.filterNotNull().ifEmpty { listOf(treeTable.root) }
+
+  /**
+   * Expands or collapses the selected rows with everything under them. With no selection this is
+   * the whole project.
+   */
+  fun expandSubtrees(isExpanded: Boolean) {
+    keepSelection(keepFocus = true) {
+      expandScope().forEach { root ->
+        if (root !== treeTable.root) {
+          root.isExpanded = isExpanded
+        }
+        root.depthFirstWalk {
+          it.isExpanded = isExpanded
+          return@depthFirstWalk true
+        }
+      }
+    }
+  }
+
+  /**
+   * Shows [level] levels of the outline: the rows above that depth are expanded and the rest is
+   * collapsed. Level 1 leaves only the topmost rows.
+   */
+  fun expandToLevel(level: Int) {
+    keepSelection(keepFocus = true) {
+      expandBelow(treeTable.root, depth = 0, level = level)
+    }
+  }
+
+  private fun expandBelow(item: TreeItem<NodeType>, depth: Int, level: Int) {
+    item.children.forEach { child ->
+      child.isExpanded = depth + 1 < level
+      expandBelow(child, depth + 1, level)
+    }
+  }
 }
+
+/** The deepest outline level which has a shortcut of its own. */
+const val MAX_OUTLINE_LEVEL = 9
 
 
 /**

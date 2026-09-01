@@ -54,6 +54,11 @@ public class TaskRendererImpl2 extends ChartRendererBase {
 
   class GanttChartSceneApi implements GanttChartSceneBuilder.InputApi {
     @Override
+    public java.util.Set<Integer> getSelectedTaskIds() {
+      return myModel.getSelectedTaskIds();
+    }
+
+    @Override
     public int getHeaderHeight() {
       return myModel.getChartUIConfiguration().getHeaderHeight();
     }

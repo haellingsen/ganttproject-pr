@@ -110,7 +110,9 @@ public class DefaultEnumerationOption<T> extends GPAbstractOption<String> implem
     // Create an ObservableChoice from this enumeration option
     ObservableChoice<String> observableChoice = new ObservableChoice<>(
       getID(),
-      getValue() != null ? getValue() : (myValues.isEmpty() ? null : myValues.get(0)),
+      // No value means no selection. Falling back to the first value would silently pick one, and
+      // committing the page would then apply it.
+      getValue(),
       new ArrayList<>(myValues),
       new javafx.util.StringConverter<String>() {
         @Override
@@ -118,7 +120,13 @@ public class DefaultEnumerationOption<T> extends GPAbstractOption<String> implem
           if (myValueLocalizer != null) {
             return myValueLocalizer.apply(object);
           }
-          return object;
+          if (object == null) {
+            return null;
+          }
+          // The values of an enumeration option are keys, in the same way as in the Swing page
+          // builder. Without this the raw key shows up in the dropdown.
+          String localized = i18n("optionValue." + object + ".label");
+          return localized == null ? object : localized;
         }
 
         @Override

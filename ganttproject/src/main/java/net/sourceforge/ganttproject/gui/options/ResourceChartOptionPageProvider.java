@@ -18,9 +18,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 package net.sourceforge.ganttproject.gui.options;
 
+import biz.ganttproject.FxUiComponent;
 import biz.ganttproject.core.option.GPOptionGroup;
+import javafx.scene.Node;
 
-public class ResourceChartOptionPageProvider extends OptionPageProviderBase {
+public class ResourceChartOptionPageProvider extends OptionPageProviderBase implements FxUiComponent {
 
   public ResourceChartOptionPageProvider() {
     super("resourceChart");
@@ -29,5 +31,10 @@ public class ResourceChartOptionPageProvider extends OptionPageProviderBase {
   @Override
   public GPOptionGroup[] getOptionGroups() {
     return getUiFacade().getResourceChart().getOptionGroups();
+  }
+
+  @Override
+  public Node buildNode() {
+    return FxOptionPageKt.buildFxOptionPage(getOptionGroups());
   }
 }

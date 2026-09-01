@@ -66,6 +66,16 @@ interface PropertyPaneBuilder {
    */
   fun numeric(property: ObservableInt, options: (IntDisplayOptions.() -> Unit)? = null)
 
+  /**
+   * Adds a numeric field for a decimal value.
+   */
+  fun numeric(property: ObservableDouble)
+
+  /**
+   * Adds a color picker.
+   */
+  fun color(property: ObservableColor)
+
   fun title(title: String)
 }
 

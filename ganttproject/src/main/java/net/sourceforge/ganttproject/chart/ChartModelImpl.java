@@ -40,6 +40,9 @@ public class ChartModelImpl extends ChartModelBase {
 
   private final TaskRendererImpl2 myTaskRendererImpl;
 
+  /** Task ids of the currently selected tasks, used to highlight their dependencies. */
+  private java.util.function.Supplier<java.util.Set<Integer>> mySelectedTaskIds = java.util.Collections::emptySet;
+
   private TaskManager taskManager;
 
   // private boolean isPreviousState = false;
@@ -53,6 +56,14 @@ public class ChartModelImpl extends ChartModelBase {
   private Set<Task> myHiddenTasks;
 
   private List<GanttPreviousStateTask> myBaseline;
+
+  public void setSelectedTaskIds(java.util.function.Supplier<java.util.Set<Integer>> supplier) {
+    mySelectedTaskIds = supplier;
+  }
+
+  public java.util.Set<Integer> getSelectedTaskIds() {
+    return mySelectedTaskIds.get();
+  }
 
   public ChartModelImpl(TaskManager taskManager, TimeUnitStack timeUnitStack, final UIConfiguration projectConfig) {
     super(taskManager, timeUnitStack, projectConfig);
@@ -228,6 +239,7 @@ public class ChartModelImpl extends ChartModelBase {
   @Override
   public ChartModelBase createCopy() {
     ChartModelImpl result = new ChartModelImpl(getTaskManager(), getTimeUnitStack(), getProjectConfig());
+    result.setSelectedTaskIds(mySelectedTaskIds);
     super.setupCopy(result);
     result.setVisibleTasks(getVisibleTasks());
     result.setBaseline(getBaseline());

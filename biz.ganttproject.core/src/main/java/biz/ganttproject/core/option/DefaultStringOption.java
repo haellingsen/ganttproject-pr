@@ -36,4 +36,14 @@ public class DefaultStringOption extends GPAbstractOption<String> implements Str
   public void loadPersistentValue(String value) {
     setValue(value);
   }
+
+  private ObservableString myObservable = null;
+
+  @Override
+  public void visitPropertyPaneBuilder(PropertyPaneBuilder builder) {
+    if (myObservable == null) {
+      myObservable = LegacyOptionBridgeKt.toObservable(this);
+    }
+    builder.text(myObservable, null);
+  }
 }

@@ -88,6 +88,21 @@ public class GanttGraphicArea extends ChartComponentBase implements GanttChart, 
     myUndoManager = undoManager;
 
     myChartModel = new ChartModelImpl(getTaskManager(), app.getTimeUnitStack(), app.getUIConfiguration());
+    myChartModel.setSelectedTaskIds(() -> app.getUIFacade().getTaskSelectionManager().getSelectedTasks().stream()
+        .map(net.sourceforge.ganttproject.task.Task::getTaskID).collect(java.util.stream.Collectors.toSet()));
+    // The dependencies of the selected tasks are drawn in their own style, so the chart has to be
+    // repainted when the selection changes.
+    app.getUIFacade().getTaskSelectionManager().addSelectionListener(
+        new net.sourceforge.ganttproject.task.TaskSelectionManager.Listener() {
+          @Override
+          public void selectionChanged(java.util.List<net.sourceforge.ganttproject.task.Task> currentSelection, Object source) {
+            repaint();
+          }
+
+          @Override
+          public void userInputConsumerChanged(Object newConsumer) {
+          }
+        });
     myChartModel.addOptionChangeListener(this::repaint);
     myStateDiffOptions = createBaselineColorOptions(myChartModel, app.getUIConfiguration());
     //this.tree = ttree;
