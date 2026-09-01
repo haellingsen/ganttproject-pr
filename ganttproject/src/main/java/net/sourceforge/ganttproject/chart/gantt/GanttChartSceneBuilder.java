@@ -62,6 +62,7 @@ public class GanttChartSceneBuilder {
     TimeDuration createLength(TimeUnit timeUnit, Date startDate, Date endDate);
     TimeDuration createLength(int duration);
     CustomPropertyManager getCustomPropertyManager();
+    java.util.Set<Integer> getSelectedTaskIds();
   }
 
   private final Canvas canvas;
@@ -167,7 +168,7 @@ public class GanttChartSceneBuilder {
 
   private void renderDependencies() {
     DependencySceneBuilder.ChartApi chartApi = () -> getRectangleHeight();
-    var taskApi = new DependencySceneTaskApi(input.getVisibleTasks(), mySplitter);
+    var taskApi = new DependencySceneTaskApi(input.getVisibleTasks(), mySplitter, input.getSelectedTaskIds());
     DependencySceneBuilder<ITask, BarChartConnectorImpl> dependencyRenderer = new DependencySceneBuilder<>(
         getPrimitiveContainer(), getPrimitiveContainer().getLayer(1), taskApi, chartApi);
     dependencyRenderer.build();

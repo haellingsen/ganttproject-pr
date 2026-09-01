@@ -72,4 +72,14 @@ public class DefaultBooleanOption extends GPAbstractOption<Boolean> implements B
       watcher.invoke(new ObservableEvent<>((Boolean) event.getOldValue(), (Boolean) event.getNewValue(), event.getTriggerID()));
     });
   }
+
+  private ObservableBoolean myObservable = null;
+
+  @Override
+  public void visitPropertyPaneBuilder(PropertyPaneBuilder builder) {
+    if (myObservable == null) {
+      myObservable = LegacyOptionBridgeKt.toObservable(this);
+    }
+    builder.binaryChoice(myObservable, null);
+  }
 }

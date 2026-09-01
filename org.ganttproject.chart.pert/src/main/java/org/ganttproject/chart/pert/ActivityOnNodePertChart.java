@@ -147,8 +147,14 @@ public class ActivityOnNodePertChart extends PertChart {
 
     this.addMouseListener(new MouseListener() {
       @Override
-      public void mouseClicked(MouseEvent arg0) {
-        // nothing to do...
+      public void mouseClicked(MouseEvent e) {
+        // Selecting the task here makes the chart a way of navigating the project: the task table
+        // scrolls to the task and the gantt chart highlights its dependencies.
+        GraphicalNode clicked = getGraphicalNode(e.getX(), e.getY());
+        if (clicked != null && getTaskSelectionManager() != null) {
+          getTaskSelectionManager().setSelectedTasks(
+              java.util.Collections.singletonList(clicked.node.getTask()), ActivityOnNodePertChart.this);
+        }
       }
 
       @Override

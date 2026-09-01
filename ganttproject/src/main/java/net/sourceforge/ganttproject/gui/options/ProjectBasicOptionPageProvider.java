@@ -18,13 +18,17 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 package net.sourceforge.ganttproject.gui.options;
 
+import biz.ganttproject.FxUiComponent;
+import javafx.scene.Node;
+
 import java.awt.Component;
 
 import biz.ganttproject.core.option.GPOptionGroup;
 
 
-public class ProjectBasicOptionPageProvider extends OptionPageProviderBase {
+public class ProjectBasicOptionPageProvider extends OptionPageProviderBase implements FxUiComponent {
   private ProjectSettingsPanel mySettingsPanel;
+  private ProjectBasicOptionPageFx myFxPage;
 
   public ProjectBasicOptionPageProvider() {
     super("project.basic");
@@ -49,7 +53,18 @@ public class ProjectBasicOptionPageProvider extends OptionPageProviderBase {
   }
 
   @Override
+  public Node buildNode() {
+    myFxPage = new ProjectBasicOptionPageFx(getProject());
+    return myFxPage.buildNode();
+  }
+
+  @Override
   public void commit() {
-    mySettingsPanel.applyChanges(false);
+    // Only the page which was actually built has anything to write back.
+    if (myFxPage != null) {
+      myFxPage.commit();
+    } else if (mySettingsPanel != null) {
+      mySettingsPanel.applyChanges(false);
+    }
   }
 }

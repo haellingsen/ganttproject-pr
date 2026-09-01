@@ -18,6 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 package net.sourceforge.ganttproject.gui.options;
 
+import biz.ganttproject.FxUiComponent;
 import biz.ganttproject.core.option.ChangeValueEvent;
 import biz.ganttproject.core.option.ChangeValueListener;
 import biz.ganttproject.core.option.GPOptionGroup;
@@ -32,6 +33,10 @@ import net.sourceforge.ganttproject.gui.UIUtil;
 import net.sourceforge.ganttproject.language.GanttLanguage;
 import net.sourceforge.ganttproject.util.collect.Pair;
 
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.layout.VBox;
+
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
@@ -44,9 +49,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-public class InterfaceOptionPageProvider extends OptionPageProviderBase {
+public class InterfaceOptionPageProvider extends OptionPageProviderBase implements FxUiComponent {
   public static final String ID = "ui.general";
   private JEditorPane myLabel;
+  private Label myFxLabel;
 
   public InterfaceOptionPageProvider() {
     super(ID);
@@ -59,16 +65,23 @@ public class InterfaceOptionPageProvider extends OptionPageProviderBase {
       @Override
       public void changeValue(ChangeValueEvent event) {
         Locale selectedLocale = uiFacade.getLanguageOption().getSelectedValue();
-        if (selectedLocale != null && "gl".equals(selectedLocale.getLanguage().toLowerCase()) && myLabel != null) {
+        if (selectedLocale != null && "gl".equals(selectedLocale.getLanguage().toLowerCase())) {
           Pair<Boolean, File> localeTest = checkLocale(selectedLocale);
           if (!localeTest.first() && localeTest.second() != null) {
             GanttLanguage i18n = GanttLanguage.getInstance();
-            myLabel.setVisible(true);
-            myLabel.setText(i18n.formatText("optionPage.ui.general.localeInstallText",
-                i18n.getText("optionPage.ui.general.localeInstallUrl"), localeTest.second().getAbsolutePath()));
+            String text = i18n.formatText("optionPage.ui.general.localeInstallText",
+                i18n.getText("optionPage.ui.general.localeInstallUrl"), localeTest.second().getAbsolutePath());
+            if (myLabel != null) {
+              myLabel.setVisible(true);
+              myLabel.setText(text);
+            }
+            setFxLocaleNotice(text);
           }
-        } else if (myLabel != null && myLabel.isVisible()) {
-          myLabel.setVisible(false);
+        } else {
+          if (myLabel != null && myLabel.isVisible()) {
+            myLabel.setVisible(false);
+          }
+          setFxLocaleNotice(null);
         }
       }
     });
@@ -160,5 +173,25 @@ public class InterfaceOptionPageProvider extends OptionPageProviderBase {
       fallback = file;
     }
     return fallback;
+  }
+
+  @Override
+  public Node buildNode() {
+    // The page itself is built from the option groups. The only custom part is the notice which
+    // asks the user to install a locale extension, and it is shown for one locale only.
+    myFxLabel = new Label();
+    myFxLabel.setWrapText(true);
+    myFxLabel.setVisible(false);
+    myFxLabel.setManaged(false);
+    return new VBox(FxOptionPageKt.buildFxOptionPage(getOptionGroups()), myFxLabel);
+  }
+
+  private void setFxLocaleNotice(String text) {
+    if (myFxLabel == null) {
+      return;
+    }
+    myFxLabel.setText(text == null ? "" : text);
+    myFxLabel.setVisible(text != null);
+    myFxLabel.setManaged(text != null);
   }
 }

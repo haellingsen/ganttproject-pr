@@ -18,9 +18,11 @@ along with GanttProject.  If not, see <http://www.gnu.org/licenses/>.
  */
 package net.sourceforge.ganttproject.gui.options;
 
+import biz.ganttproject.FxUiComponent;
 import biz.ganttproject.core.option.GPOptionGroup;
+import javafx.scene.Node;
 
-public class GanttChartOptionPageProvider extends OptionPageProviderBase {
+public class GanttChartOptionPageProvider extends OptionPageProviderBase implements FxUiComponent {
 
   public GanttChartOptionPageProvider() {
     super("ganttChart");
@@ -29,5 +31,10 @@ public class GanttChartOptionPageProvider extends OptionPageProviderBase {
   @Override
   public GPOptionGroup[] getOptionGroups() {
     return getUiFacade().getGanttChart().getOptionGroups();
+  }
+
+  @Override
+  public Node buildNode() {
+    return FxOptionPageKt.buildFxOptionPage(getOptionGroups());
   }
 }

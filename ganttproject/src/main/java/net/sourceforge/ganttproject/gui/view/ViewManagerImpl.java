@@ -59,6 +59,16 @@ public class ViewManagerImpl implements GPViewManager {
                          List<ViewProvider> viewProviders) {
     myViewProviders = viewProviders;
     myViewPane = viewPane;
+    for (ViewProvider viewProvider : viewProviders) {
+      // A view provider and the chart it provides may be the same object or two, so offer the
+      // selection to both.
+      for (Object candidate : new Object[] {viewProvider, viewProvider.getChart()}) {
+        if (candidate instanceof net.sourceforge.ganttproject.chart.TaskSelectionAware) {
+          ((net.sourceforge.ganttproject.chart.TaskSelectionAware) candidate)
+              .setTaskSelectionManager(uiFacade.getTaskSelectionManager());
+        }
+      }
+    }
     project.addProjectEventListener(getProjectEventListener());
     // Create actions
     myCopyAction = ViewPaneKt.createCopyAction(this, uiFacade);

@@ -67,4 +67,9 @@ public class DefaultFontOption extends GPAbstractOption<FontSpec> implements Fon
     }
     return result;
   }
+
+  @Override
+  public void visitPropertyPaneBuilder(PropertyPaneBuilder builder) {
+    LegacyOptionBridgeKt.visitFontPane(this, builder);
+  }
 }

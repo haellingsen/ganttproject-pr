@@ -28,8 +28,10 @@ import biz.ganttproject.ganttview.*
 import biz.ganttproject.ganttview.ItemListDialogPane
 import javafx.beans.property.BooleanProperty
 import javafx.beans.property.SimpleBooleanProperty
+import javafx.beans.value.ChangeListener
 import javafx.collections.FXCollections
 import javafx.embed.swing.SwingNode
+import javafx.geometry.Bounds
 import javafx.geometry.Insets
 import javafx.scene.Node
 import javafx.scene.control.Label
@@ -70,8 +72,9 @@ data class OptionPageItem(
   }
 }
 
-class OptionPageUi(editItem: ObservableObject<OptionPageItem?>, var resize: ()->Unit): ItemEditorPane {
+class OptionPageUi(editItem: ObservableObject<OptionPageItem?>, private val resize: ()->Unit): ItemEditorPane {
   private val borderPane = BorderPane()
+  private var lateResize: LateResize? = null
   override val node: Node
     get() = borderPane
 
@@ -79,12 +82,25 @@ class OptionPageUi(editItem: ObservableObject<OptionPageItem?>, var resize: ()->
     editItem.addWatcher { event ->
       event.newValue?.let {
         if (it != event.oldValue) {
-          FXUtil.transitionCenterPane(borderPane, it.fxNode) {
-            FXUtil.runLater(500) {
+          if (it.provider is FxUiComponent) {
+            // A JavaFX page is complete as soon as it is built, so it needs neither the fade nor
+            // the delay which cover the asynchronous content of a Swing page.
+            borderPane.center = it.fxNode
+            FXUtil.runLater {
               resize()
               it.fxNode.requestFocus()
-              if (borderPane.width != 0.0) {
-                resize = {}
+            }
+          } else {
+            FXUtil.transitionCenterPane(borderPane, it.fxNode) {
+              FXUtil.runLater(SWING_PAGE_RESIZE_DELAY_MS) {
+                resize()
+                it.fxNode.requestFocus()
+                // The Swing content is installed asynchronously and may be still missing here.
+                // The dialog is then sized to an empty page and stays collapsed until the window
+                // is resized by hand. Size it again when the content shows up.
+                if (borderPane.width == 0.0 || it.fxNode.layoutBounds.isEmpty) {
+                  resizeWhenNotEmpty(it.fxNode)
+                }
               }
             }
           }
@@ -93,9 +109,35 @@ class OptionPageUi(editItem: ObservableObject<OptionPageItem?>, var resize: ()->
       }
     }
   }
+  private fun resizeWhenNotEmpty(node: Node) {
+    lateResize?.cancel()
+    lateResize = LateResize(node) { resize() }.also { it.start() }
+  }
+
   override fun focus() {
   }
 }
+
+/** Runs [code] once, when [node] gets a non-empty layout size. */
+private class LateResize(private val node: Node, private val code: ()->Unit) {
+  private val listener = ChangeListener<Bounds> { _, _, newValue ->
+    if (newValue != null && !newValue.isEmpty) {
+      cancel()
+      // Not from inside the layout pass which fired this listener.
+      FXUtil.runLater(code)
+    }
+  }
+
+  fun start() {
+    node.layoutBoundsProperty().addListener(listener)
+  }
+
+  fun cancel() {
+    node.layoutBoundsProperty().removeListener(listener)
+  }
+}
+
+private const val SWING_PAGE_RESIZE_DELAY_MS = 500L
 
 class SettingsDialogFx(private val project: IGanttProject,
                        private val uiFacade: UIFacade,

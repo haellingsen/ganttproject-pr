@@ -35,4 +35,10 @@ open class DefaultColorOption : GPAbstractOption<Color?>, ColorOption {
   override fun loadPersistentValue(value: String) {
     resetValue(determineColor(value), true)
   }
+
+    private val observable: ObservableColor by lazy { toObservable() }
+
+    override fun visitPropertyPaneBuilder(builder: PropertyPaneBuilder) {
+        builder.color(observable)
+    }
 }

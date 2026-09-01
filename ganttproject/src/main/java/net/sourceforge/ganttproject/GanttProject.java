@@ -127,6 +127,68 @@ public class GanttProject extends GanttProjectBase implements ResourceView, Gant
   );
 
 
+  /** Levels which get a menu entry. The shortcuts go deeper than this. */
+  private static final int MENU_OUTLINE_LEVELS = 5;
+
+  /**
+   * Expands or collapses the task outline. The labels are not in the translations yet and the
+   * actions provide them directly.
+   */
+  private static class OutlineAction extends GPAction {
+    private final String myLabel;
+    private final Runnable myOnAction;
+
+    OutlineAction(String id, String label, Runnable onAction) {
+      super(id);
+      myLabel = label;
+      myOnAction = onAction;
+      // The superclass resolves the label before these fields exist.
+      updateName();
+    }
+
+    @Override
+    public String getLocalizedName() {
+      return myLabel;
+    }
+
+    @Override
+    public void actionPerformed(java.awt.event.ActionEvent e) {
+      myOnAction.run();
+    }
+  }
+
+  /**
+   * Opens the window which lists the dependencies of the selected task. The label is not in the
+   * translations yet, so the action provides it directly.
+   */
+  private static class ShowDependenciesAction extends GPAction {
+    private final Runnable myOnAction;
+
+    ShowDependenciesAction(Runnable onAction) {
+      super("task.dependencies");
+      myOnAction = onAction;
+    }
+
+    @Override
+    public String getLocalizedName() {
+      return "Dependencies...";
+    }
+
+    @Override
+    public void actionPerformed(java.awt.event.ActionEvent e) {
+      myOnAction.run();
+    }
+  }
+
+  private biz.ganttproject.ganttview.DependencyNavigator myDependencyNavigator;
+
+  private biz.ganttproject.ganttview.DependencyNavigator getDependencyNavigator() {
+    if (myDependencyNavigator == null) {
+      myDependencyNavigator = new biz.ganttproject.ganttview.DependencyNavigator(getUIFacade());
+    }
+    return myDependencyNavigator;
+  }
+
   public JMenuBar getMenuBar() {
     var bar = new JMenuBar();
 
@@ -134,12 +196,21 @@ public class GanttProject extends GanttProjectBase implements ResourceView, Gant
     bar.add(myEditMenu);
 
     ViewMenu viewMenu = new ViewMenu(getProject(), getViewManager(), getUiFacadeImpl().getDpiOption(), getUiFacadeImpl().getChartFontOption(), "view");
+    viewMenu.addSeparator();
+    viewMenu.add(new OutlineAction("tree.expandAll", "Expand all", () -> myTaskTableSupplier.get().expandSubtrees(true)));
+    viewMenu.add(new OutlineAction("tree.collapseAll", "Collapse all", () -> myTaskTableSupplier.get().expandSubtrees(false)));
+    for (int level = 1; level <= MENU_OUTLINE_LEVELS; level++) {
+      final int outlineLevel = level;
+      viewMenu.add(new OutlineAction("tree.expandLevel" + level, "Show level " + level,
+          () -> myTaskTableSupplier.get().expandToLevel(outlineLevel)));
+    }
     bar.add(viewMenu);
 
     JMenu mTask = UIUtil.createTooltiplessJMenu(GPAction.createVoidAction("task"));
     mTask.add(myTaskActions.getCreateAction());
     mTask.add(myTaskActions.getPropertiesAction());
     mTask.add(myTaskActions.getDeleteAction());
+    mTask.add(new ShowDependenciesAction(() -> getDependencyNavigator().show()));
     bar.add(mTask);
 
     JMenu mHuman = UIUtil.createTooltiplessJMenu(GPAction.createVoidAction("human"));

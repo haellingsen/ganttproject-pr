@@ -40,4 +40,14 @@ public class DefaultDoubleOption extends GPAbstractOption<Double> implements Dou
       resetValue(null, true);
     }
   }
+
+  private ObservableDouble myObservable = null;
+
+  @Override
+  public void visitPropertyPaneBuilder(PropertyPaneBuilder builder) {
+    if (myObservable == null) {
+      myObservable = LegacyOptionBridgeKt.toObservable(this);
+    }
+    builder.numeric(myObservable);
+  }
 }
