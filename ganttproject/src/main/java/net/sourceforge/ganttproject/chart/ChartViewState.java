@@ -67,20 +67,30 @@ public class ChartViewState implements ScrollingListener, ZoomListener {
   @Override
   public void zoomChanged(ZoomEvent e) {
     myCurrentZoomState = e.getNewZoomState();
-    Date date;
-    var activeView = myUIFacade.getViewManager().getActiveView();
-    if (activeView != null && Objects.equals(activeView.getId(), String.valueOf(UIFacade.GANTT_INDEX))) {
-      date = myUIFacade.getTaskSelectionManager().getSelectedTasks().stream()
-          .map(t -> t.getStart().getTime())
-          .min(Comparator.naturalOrder()).orElse(myChart.getStartDate());
-    } else {
-      date = myChart.getStartDate();
-    }
+    Date focusDate = getFocusDate();
 
     myChart.setTopUnit(getTopTimeUnit());
     myChart.setBottomUnit(getBottomTimeUnit());
     myChart.setBottomUnitWidth(getBottomUnitWidth());
-    myChart.setStartDate(date == null ? new Date() : date);
+    ChartCentering.centerOn(myChart, focusDate == null ? new Date() : focusDate);
+  }
+
+  /**
+   * What the zoom holds on to: the earliest selected task when something is selected, and otherwise
+   * whatever the user has in the middle of the chart. Scrolling to today puts today in the middle,
+   * so today stays put while zooming until the user looks somewhere else.
+   */
+  private Date getFocusDate() {
+    var activeView = myUIFacade.getViewManager().getActiveView();
+    if (activeView != null && Objects.equals(activeView.getId(), String.valueOf(UIFacade.GANTT_INDEX))) {
+      Date selected = myUIFacade.getTaskSelectionManager().getSelectedTasks().stream()
+          .map(t -> t.getStart().getTime())
+          .min(Comparator.naturalOrder()).orElse(null);
+      if (selected != null) {
+        return selected;
+      }
+    }
+    return ChartCentering.getCenterDate(myChart);
   }
 
   public int getBottomUnitWidth() {

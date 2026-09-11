@@ -22,6 +22,7 @@ import java.awt.event.ActionEvent;
 import java.util.Date;
 
 import net.sourceforge.ganttproject.action.GPAction;
+import net.sourceforge.ganttproject.chart.ChartCentering;
 import net.sourceforge.ganttproject.chart.TimelineChart;
 
 public class ScrollToTodayAction extends GPAction {
@@ -34,6 +35,6 @@ public class ScrollToTodayAction extends GPAction {
 
   @Override
   public void actionPerformed(ActionEvent e) {
-    myChart.setStartDate(new Date());
+    ChartCentering.centerOn(myChart, new Date());
   }
 }

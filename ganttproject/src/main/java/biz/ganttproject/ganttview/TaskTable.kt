@@ -487,6 +487,16 @@ class TaskTable(
 
   private fun findNameColumn() = treeTable.columns.find { (it.userData as ColumnList.Column).id == TaskDefaultColumn.NAME.stub.id }
 
+  /**
+   * Expands every ancestor of the given tasks, so that all of them get a row in the table and a bar
+   * in the chart. Nothing else changes: the selection stays, and no subtree is collapsed.
+   */
+  fun revealTasks(tasks: List<Task>) {
+    Platform.runLater {
+      ancestors(tasks, taskManager.taskHierarchy).reversed().forEach { task2treeItem[it]?.isExpanded = true }
+    }
+  }
+
   fun reload(termination: OnBarrierReached? = null) {
     treeTable.reload(::sync, termination)
   }

@@ -27,6 +27,7 @@ import java.awt.*;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
+import java.util.function.IntSupplier;
 
 public class ScrollViewInteraction extends MouseInteractionBase implements MouseInteraction {
   private final double myWheelFactor = Double.parseDouble(GPAction.getKeyStrokeText("mouse.wheel.factor"));
@@ -34,9 +35,12 @@ public class ScrollViewInteraction extends MouseInteractionBase implements Mouse
   private int myCurY;
   private int myCurX;
   private final ScrollingSession myScrollingSession;
+  private final IntSupplier myRowHeight;
 
-  public ScrollViewInteraction(MouseEvent e, TimelineFacade timelineFacade, GPObservable<GPCursor> cursorProperty) {
+  public ScrollViewInteraction(MouseEvent e, TimelineFacade timelineFacade, GPObservable<GPCursor> cursorProperty,
+                               IntSupplier rowHeight) {
     super(timelineFacade.getDateAt(0), timelineFacade);
+    myRowHeight = rowHeight;
     myScrollingSession = timelineFacade.createScrollingSession(e.getX(), e.getY());
     myCurX = e.getX();
     myCurY = e.getY();
@@ -51,15 +55,16 @@ public class ScrollViewInteraction extends MouseInteractionBase implements Mouse
       if (wheelEvent.getWheelRotation() == 0) {
         return;
       }
-      int scrollIncrement = (int)(
-          Math.max(wheelEvent.getScrollAmount(), 10)
-              * (wheelEvent.getWheelRotation() < 0 ? myWheelFactor : -myWheelFactor)
-      );
+      int direction = wheelEvent.getWheelRotation() < 0 ? 1 : -1;
       if ((event.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) == 0) {
-        // Vertical scroll
-        myCurY += scrollIncrement;
+        // Vertical scroll. Move whole rows, as many as the task table moves for the same notch, so
+        // that the two halves of the view keep step with each other. A fixed pixel step made the
+        // chart crawl while the table raced ahead.
+        int rows = Math.max(wheelEvent.getScrollAmount(), 1) * Math.abs(wheelEvent.getWheelRotation());
+        int rowHeight = Math.max(myRowHeight.getAsInt(), 1);
+        myCurY += (int) (direction * rows * rowHeight * myWheelFactor);
       } else {
-        myCurX += scrollIncrement;
+        myCurX += (int) (Math.max(wheelEvent.getScrollAmount(), 10) * direction * myWheelFactor);
       }
     } else {
       myCurX = event.getX();

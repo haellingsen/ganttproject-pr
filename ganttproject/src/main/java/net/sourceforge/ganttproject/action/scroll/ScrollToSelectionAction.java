@@ -19,6 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 package net.sourceforge.ganttproject.action.scroll;
 
 import net.sourceforge.ganttproject.action.GPAction;
+import net.sourceforge.ganttproject.chart.ChartCentering;
 import net.sourceforge.ganttproject.chart.TimelineChart;
 import net.sourceforge.ganttproject.gui.UIFacade;
 import net.sourceforge.ganttproject.task.Task;
@@ -51,7 +52,7 @@ public class ScrollToSelectionAction extends GPAction implements TaskSelectionMa
         earliestStartDate = selectedTask.getStart().getTime();
       }
     }
-    myChart.setStartDate(earliestStartDate);
+    ChartCentering.centerOn(myChart, earliestStartDate);
   }
 
   @Override

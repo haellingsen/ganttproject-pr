@@ -171,7 +171,8 @@ public abstract class AbstractChartImplementation implements TimelineChart, Zoom
   public void beginScrollViewInteraction(MouseEvent e) {
     TimelineFacadeImpl timelineFacade = new TimelineFacadeImpl(getChartModel(), myProject.getTaskManager());
     timelineFacade.setVScrollController(myVScrollController);
-    setActiveInteraction(new ScrollViewInteraction(e, timelineFacade, myChartComponent.getCursorProperty()));
+    setActiveInteraction(new ScrollViewInteraction(e, timelineFacade, myChartComponent.getCursorProperty(),
+        () -> getChartModel().getChartUIConfiguration().getRowHeight()));
   }
 
   public MouseInteraction finishInteraction() {

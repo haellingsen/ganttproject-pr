@@ -94,10 +94,26 @@ public class DependencySceneBuilder<T extends IdentifiableRow, D extends BarChar
         Point second = new Point(xEntry, dependeeVector.getPoint().y);
         Point third = new Point(xEntry, yEntry);
 
-        primitiveContainer.createLine(first.x, first.y, second.x, second.y).setStyle(lineStyle);
-        Line secondLine = primitiveContainer.createLine(second.x, second.y, third.x, third.y);
-        secondLine.setStyle(lineStyle);
-        secondLine.setArrow(myFinishArrow);
+        // Several dependencies which enter the same task from above share the vertical segment, and
+        // their arrow heads sit on that shared line. Route the last stretch diagonally instead, so every
+        // dependency gets its own visible 45-degree entry off the vertical line.
+        int diagonal = myBarHeight;
+        int xsign = Integer.signum(xEntry - first.x);
+        int ysign = Integer.signum(yEntry - first.y);
+        if (xsign != 0 && ysign != 0 && Math.abs(xEntry - first.x) > diagonal && Math.abs(yEntry - first.y) > diagonal) {
+          int xDrop = xEntry - xsign * diagonal;
+          Point bend = new Point(xDrop, yEntry - ysign * diagonal);
+          primitiveContainer.createLine(first.x, first.y, xDrop, first.y).setStyle(lineStyle);
+          primitiveContainer.createLine(xDrop, first.y, bend.x, bend.y).setStyle(lineStyle);
+          Line lastLine = primitiveContainer.createLine(bend.x, bend.y, third.x, third.y);
+          lastLine.setStyle(lineStyle);
+          lastLine.setArrow(myFinishArrow);
+        } else {
+          primitiveContainer.createLine(first.x, first.y, second.x, second.y).setStyle(lineStyle);
+          Line secondLine = primitiveContainer.createLine(second.x, second.y, third.x, third.y);
+          secondLine.setStyle(lineStyle);
+          secondLine.setArrow(myFinishArrow);
+        }
       } else if (dependantVector.getHProjection().reaches(dependeeVector.getHProjection().getPoint(3))) {
         Point first = dependeeVector.getPoint(3);
         Point second = new Point(first.x, dependantVector.getPoint().y);
