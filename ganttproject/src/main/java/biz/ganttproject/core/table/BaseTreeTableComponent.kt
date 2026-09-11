@@ -150,6 +150,8 @@ abstract class BaseTreeTableComponent<NodeType, BuiltinColumnType: BuiltinColumn
 
   protected fun initKeyboardEventHandlers(keyActions: List<GPAction>) {
     treeTable.addEventFilter(KeyEvent.KEY_PRESSED) { event ->
+      // Tab toggles the focused row. While a cell is being edited, Tab keeps its editing meaning.
+      if (treeTable.editingCell != null) return@addEventFilter
       event.whenMatches("tree.expand") {
         val focusedCell = treeTable.focusModel.focusedCell ?: return@whenMatches
         keepSelection(keepFocus = true) {
@@ -161,6 +163,9 @@ abstract class BaseTreeTableComponent<NodeType, BuiltinColumnType: BuiltinColumn
       }
       event.whenMatches("tree.collapseAll") {
         expandSubtrees(isExpanded = false)
+      }
+      event.whenMatches("tree.cycle") {
+        cycleOutline()
       }
       for (level in 1..MAX_OUTLINE_LEVEL) {
         event.whenMatches("tree.expandLevel$level") {
@@ -231,26 +236,14 @@ abstract class BaseTreeTableComponent<NodeType, BuiltinColumnType: BuiltinColumn
   }
 
   /**
-   * The rows which the expand and collapse actions work on: the selected rows, or the whole tree
-   * when nothing is selected.
-   */
-  private fun expandScope(): List<TreeItem<NodeType>> =
-    treeTable.selectionModel.selectedItems.filterNotNull().ifEmpty { listOf(treeTable.root) }
-
-  /**
-   * Expands or collapses the selected rows with everything under them. With no selection this is
-   * the whole project.
+   * Expands or collapses every row in the tree, whatever is selected. Use the arrow on a row, or
+   * [expandToLevel], to work on a part of the outline.
    */
   fun expandSubtrees(isExpanded: Boolean) {
     keepSelection(keepFocus = true) {
-      expandScope().forEach { root ->
-        if (root !== treeTable.root) {
-          root.isExpanded = isExpanded
-        }
-        root.depthFirstWalk {
-          it.isExpanded = isExpanded
-          return@depthFirstWalk true
-        }
+      treeTable.root.depthFirstWalk {
+        it.isExpanded = isExpanded
+        return@depthFirstWalk true
       }
     }
   }
@@ -265,6 +258,39 @@ abstract class BaseTreeTableComponent<NodeType, BuiltinColumnType: BuiltinColumn
     }
   }
 
+  /**
+   * Shift+Tab as in org-mode: each press shows one more level of the outline, and after the whole
+   * tree is open the next press folds it back to the topmost rows. The current level is read from
+   * the tree itself, so the cycle picks up wherever the user left the outline by other means.
+   * Never more than [CYCLE_LEVELS] steps: a deeper tree jumps from level 4 to fully open.
+   */
+  fun cycleOutline() {
+    val deepest = treeDepth(treeTable.root, 0)
+    if (deepest <= 1) return
+    val last = minOf(deepest, CYCLE_LEVELS)
+    val current = openLevels()
+    when {
+      current >= last -> expandSubtrees(isExpanded = false)
+      current + 1 >= last -> expandSubtrees(isExpanded = true)
+      else -> expandToLevel(current + 1)
+    }
+  }
+
+  /** How many levels are open: the deepest N such that every parent above depth N is expanded. */
+  private fun openLevels(): Int {
+    var level = 1
+    while (level < CYCLE_LEVELS && allExpandedAbove(treeTable.root, 0, level + 1)) level++
+    return level
+  }
+
+  private fun allExpandedAbove(item: TreeItem<NodeType>, depth: Int, level: Int): Boolean =
+    item.children.all { child ->
+      child.children.isEmpty() || depth + 1 >= level || (child.isExpanded && allExpandedAbove(child, depth + 1, level))
+    }
+
+  private fun treeDepth(item: TreeItem<NodeType>, depth: Int): Int =
+    item.children.maxOfOrNull { treeDepth(it, depth + 1) } ?: depth
+
   private fun expandBelow(item: TreeItem<NodeType>, depth: Int, level: Int) {
     item.children.forEach { child ->
       child.isExpanded = depth + 1 < level
@@ -275,6 +301,9 @@ abstract class BaseTreeTableComponent<NodeType, BuiltinColumnType: BuiltinColumn
 
 /** The deepest outline level which has a shortcut of its own. */
 const val MAX_OUTLINE_LEVEL = 9
+
+/** The number of steps Shift+Tab walks through before it folds everything again. */
+const val CYCLE_LEVELS = 5
 
 
 /**

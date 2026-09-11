@@ -158,35 +158,31 @@ public class GanttProject extends GanttProjectBase implements ResourceView, Gant
   }
 
   /**
-   * Opens the window which lists the dependencies of the selected task. The label is not in the
+   * Shows and hides the dependency panel which is docked in the Gantt view. The label is not in the
    * translations yet, so the action provides it directly.
    */
-  private static class ShowDependenciesAction extends GPAction {
-    private final Runnable myOnAction;
+  private static class DependencyPaneToggleAction extends GPAction {
+    private final biz.ganttproject.core.option.BooleanOption myOption;
 
-    ShowDependenciesAction(Runnable onAction) {
-      super("task.dependencies");
-      myOnAction = onAction;
+    DependencyPaneToggleAction(biz.ganttproject.core.option.BooleanOption option) {
+      super("view.dependencies");
+      myOption = option;
+      // The superclass resolves the label before this field exists.
+      updateName();
+      putValue(SELECTED_KEY, option.getValue());
+      // The option is also written by the settings and by loading a project, so follow it both ways.
+      option.addChangeValueListener(event -> putValue(SELECTED_KEY, myOption.getValue()));
     }
 
     @Override
     public String getLocalizedName() {
-      return "Dependencies...";
+      return "Task dependencies";
     }
 
     @Override
     public void actionPerformed(java.awt.event.ActionEvent e) {
-      myOnAction.run();
+      myOption.setValue(Boolean.TRUE.equals(getValue(SELECTED_KEY)), this);
     }
-  }
-
-  private biz.ganttproject.ganttview.DependencyNavigator myDependencyNavigator;
-
-  private biz.ganttproject.ganttview.DependencyNavigator getDependencyNavigator() {
-    if (myDependencyNavigator == null) {
-      myDependencyNavigator = new biz.ganttproject.ganttview.DependencyNavigator(getUIFacade());
-    }
-    return myDependencyNavigator;
   }
 
   public JMenuBar getMenuBar() {
@@ -204,13 +200,15 @@ public class GanttProject extends GanttProjectBase implements ResourceView, Gant
       viewMenu.add(new OutlineAction("tree.expandLevel" + level, "Show level " + level,
           () -> myTaskTableSupplier.get().expandToLevel(outlineLevel)));
     }
+    viewMenu.addSeparator();
+    viewMenu.add(new JCheckBoxMenuItem(
+        new DependencyPaneToggleAction(myGanttChartTabContent.getDependencyPaneOption())));
     bar.add(viewMenu);
 
     JMenu mTask = UIUtil.createTooltiplessJMenu(GPAction.createVoidAction("task"));
     mTask.add(myTaskActions.getCreateAction());
     mTask.add(myTaskActions.getPropertiesAction());
     mTask.add(myTaskActions.getDeleteAction());
-    mTask.add(new ShowDependenciesAction(() -> getDependencyNavigator().show()));
     bar.add(mTask);
 
     JMenu mHuman = UIUtil.createTooltiplessJMenu(GPAction.createVoidAction("human"));
@@ -285,6 +283,8 @@ public class GanttProject extends GanttProjectBase implements ResourceView, Gant
     myGanttChartTabContent = new GanttChartTabContentPanel(
         getProject(), getUIFacade(), area.getJComponent(), area.getCursorProperty(), area::buildContextMenu,
         getUIConfiguration(), myTaskTableSupplier, myTaskActions, myUiInitializationPromise);
+
+    options.addOptionGroups(myGanttChartTabContent.getOptionGroups());
 
     myResourceChartTabContent = new ResourceChartTabContentPanel(getProject(), getUIFacade(),
       myResourceTableSupplier, resourceChart, resourceChart.getCursorProperty(), resourceChart::buildContextMenu);

@@ -327,9 +327,8 @@ class SimpleTreeCollapseView<T> : TreeCollapseView<T> {
 
 class MyVirtualFlow<T: IndexedCell<*>> : VirtualFlow<T>() {
   fun vbarWidth() = if (this.width > 0.0 && vbar.isVisible) vbar.width else 0.0
-  init {
-    children.remove(hbar)
-  }
+  // The horizontal scrollbar stays: columns which do not fit are reached by scrolling rather than by
+  // squeezing every column down until nothing can be read.
 }
 
 class MyTreeTableRow<T> : TreeTableRow<T>() {
@@ -338,13 +337,20 @@ class MyTreeTableRow<T> : TreeTableRow<T>() {
   init {
     disclosureNode = HBox().also { hbox ->
       hbox.styleClass.setAll("tree-disclosure-node")
-      hbox.isMouseTransparent = true
       hbox.alignment = Pos.CENTER
       FontAwesomeIconView(FontAwesomeIcon.CHEVRON_RIGHT).also {
         it.styleClass.add("arrow")
         hbox.children.add(it)
       }
       hbox.prefHeightProperty().bind(heightProperty())
+      // Toggle the row from here rather than leaving it to the row skin: the skin only wires up the
+      // disclosure node it builds itself, and this one replaces it.
+      hbox.addEventHandler(MouseEvent.MOUSE_PRESSED) { event ->
+        if (event.button == MouseButton.PRIMARY) {
+          treeItem?.let { it.isExpanded = it.isExpanded.not() }
+          event.consume()
+        }
+      }
     }
   }
 }
@@ -383,24 +389,13 @@ class MyColumnResizePolicy<S>(private val table: GPTreeTableView<*>, tableWidth:
     val columnWeights = columnWidths.map { it / totalWidth }
 
     val delta = newValue - totalWidth - table.vbarWidth()
-    val newWidths =
-      if (delta > 0) {
-        // If the table gets wider, we just add delta to all columns proportionally.
-        columnWidths.zip(columnWeights).map { it.first + delta * it.second }
-      } else {
-        // If the table shrinks down, we first proportionally decrement widths...
-        val newWidths = columnWidths.zip(columnWeights).map { it.first + delta * it.second }
-        // .. however, we don't want to make column widths less than some minimum, so those columns
-        // which reached the minimum threshold will borrow some width from the remaining ones.
-        val totalOverdraft = newWidths.filter { it < 20.0 }.map { 20.0 - it }.sum()
-        newWidths.zip(columnWeights).map {
-          if (it.first < 20.0) {
-            20.0
-          } else {
-            it.first - totalOverdraft * it.second
-          }
-        }
-      }.map { round(it) }
+    if (delta <= 0) {
+      // Not enough room for the columns as they are. Leave them alone and let the horizontal
+      // scrollbar carry the rest: shrinking them to fit turns every cell into an ellipsis.
+      return
+    }
+    // Spare room is shared out across the columns in proportion to their widths.
+    val newWidths = columnWidths.zip(columnWeights).map { it.first + delta * it.second }.map { round(it) }
     val newTotalWidth = newWidths.sum()
     val diff = newValue - (newTotalWidth + table.vbarWidth())
     //println("newValue=$newValue old width=$columnWidths new width=$newWidths diff=$diff vbar=${table.vbarWidth()}")

@@ -49,16 +49,25 @@ public class LineRenderer {
     g.drawLine(line.getStartX(), line.getStartY(), line.getFinishX(), line.getFinishY());
     if (line.getArrow() != Canvas.Arrow.NONE) {
       Canvas.Arrow arrow = line.getArrow();
-      int xsign = Integer.signum(line.getFinishX() - line.getStartX());
-      int ysign = Integer.signum(line.getFinishY() - line.getStartY());
+      // The head follows the direction of the line, so diagonal segments get a proper head too.
+      double dx = line.getFinishX() - line.getStartX();
+      double dy = line.getFinishY() - line.getStartY();
+      double len = Math.hypot(dx, dy);
+      if (len == 0) {
+        dx = 0; dy = 1; len = 1;
+      }
+      double ux = dx / len;
+      double uy = dy / len;
+      double baseX = line.getFinishX() - ux * arrow.getLength();
+      double baseY = line.getFinishY() - uy * arrow.getLength();
       int[] xpoints = new int[] {
           line.getFinishX(),
-          line.getFinishX() - xsign * arrow.getLength() - Math.abs(ysign) * arrow.getWidth(),
-          line.getFinishX() - xsign * arrow.getLength() + Math.abs(ysign) * arrow.getWidth()};
+          (int) Math.round(baseX - uy * arrow.getWidth()),
+          (int) Math.round(baseX + uy * arrow.getWidth())};
       int[] ypoints = new int[] {
           line.getFinishY(),
-          line.getFinishY() - ysign * arrow.getLength() - Math.abs(xsign) * arrow.getWidth(),
-          line.getFinishY() - ysign * arrow.getLength() + Math.abs(xsign) * arrow.getWidth()};
+          (int) Math.round(baseY + ux * arrow.getWidth()),
+          (int) Math.round(baseY - ux * arrow.getWidth())};
       g.fillPolygon(xpoints, ypoints, 3);
     }
   }

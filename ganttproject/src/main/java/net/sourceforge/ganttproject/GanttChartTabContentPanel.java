@@ -20,11 +20,14 @@ package net.sourceforge.ganttproject;
 
 import biz.ganttproject.app.*;
 import biz.ganttproject.core.option.*;
+import biz.ganttproject.ganttview.DependencyNavigator;
 import biz.ganttproject.ganttview.TaskFilterActionSet;
 import biz.ganttproject.ganttview.TaskTable;
 import biz.ganttproject.task.TaskActions;
 import com.google.common.base.Suppliers;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Side;
 import javafx.scene.Node;
@@ -32,6 +35,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.SplitPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import kotlin.Unit;
@@ -73,6 +77,23 @@ class GanttChartTabContentPanel extends ChartTabContentPanel implements ViewProv
   private ViewComponents myViewComponents;
   private final GanttChartSelection mySelection;
   private final DoubleOption myDividerOption = new DefaultDoubleOption("divider", 0.5);
+  private final DependencyNavigator myDependencyNavigator;
+  // Whether the dependency panel is docked at the right hand side. Lives in the view options, so
+  // it is remembered between sessions.
+  private final BooleanOption myDependencyPaneOption = new DefaultBooleanOption("dependencyPane", true);
+  // The panel width is kept in pixels rather than as a divider fraction: a fraction drifts every
+  // time the window is resized, and the transient positions while the panel is being inserted
+  // would be saved as if the user had dragged the divider.
+  private final DoubleOption myDependencyWidthOption = new DefaultDoubleOption("dependencyPaneWidth", 480.0);
+  private boolean isApplyingDependencyDivider = false;
+  private static final double MIN_DEPENDENCY_PANE_WIDTH = 240.0;
+
+  /** The panel is a sidebar. The table and the chart keep at least two thirds between them. */
+  private static double maxDependencyPaneWidth(double splitWidth) {
+    return Math.max(MIN_DEPENDENCY_PANE_WIDTH, splitWidth / 3);
+  }
+  private final GPOptionGroup myDependencyOptionGroup =
+      new GPOptionGroup("ganttChartDependencyPane", myDependencyPaneOption, myDependencyWidthOption);
 
   GanttChartTabContentPanel(IGanttProject project, UIFacade workbenchFacade,
                             JComponent ganttChart,
@@ -102,6 +123,10 @@ class GanttChartTabContentPanel extends ChartTabContentPanel implements ViewProv
       }
     });
     mySelection = new GanttChartSelection(project.getTaskManager(), workbenchFacade.getTaskSelectionManager());
+    myDependencyNavigator = new DependencyNavigator(workbenchFacade, tasks -> {
+      myTaskTableSupplier.get().revealTasks(tasks);
+      return kotlin.Unit.INSTANCE;
+    });
   }
 
   private FXToolbarBuilder createScheduleToolbar() {
@@ -239,7 +264,118 @@ class GanttChartTabContentPanel extends ChartTabContentPanel implements ViewProv
     });
     taskTable.loadDefaultColumns();
     myInitializationCompleted.invoke();
+
+    myDependencyPaneOption.addChangeValueListener(event -> Platform.runLater(this::updateDependencyPane));
+    updateDependencyPane();
     return myViewComponents.getSplitPane();
+  }
+
+  /**
+   * Docks the dependency panel at the right hand side, or takes it away again. The divider is put
+   * back where the user last left it.
+   */
+  private void updateDependencyPane() {
+    if (myViewComponents == null) {
+      return;
+    }
+    var splitPane = myViewComponents.getSplitPane();
+    // The table and the chart are the first two items, so the panel is the third one when it is on.
+    boolean isVisible = splitPane.getItems().size() > 2;
+    if (Boolean.TRUE.equals(myDependencyPaneOption.getValue())) {
+      if (!isVisible) {
+        var paneNode = myDependencyNavigator.getNode();
+        SplitPane.setResizableWithParent(paneNode, Boolean.FALSE);
+        // Worth restoring only when the split pane is already laid out. At startup the first divider
+        // still holds its default and the table gets its width later, from the column widths.
+        double tableDivider = splitPane.getWidth() > 0.0 && splitPane.getDividerPositions().length > 0
+            ? splitPane.getDividerPositions()[0] : -1.0;
+        // Inserting an item makes JavaFX redistribute the dividers, and those positions are not the
+        // user's choice. Hold the flag over the insertion as well as over our own divider call.
+        isApplyingDependencyDivider = true;
+        splitPane.getItems().add(paneNode);
+        applyDependencyWidth(tableDivider);
+        // The stored width is in pixels, so the divider has to be recomputed whenever the window
+        // changes size. Without this the panel would grow and shrink with the window.
+        splitPane.widthProperty().addListener((observable, oldValue, newValue) -> applyDependencyWidth(-1.0));
+        splitPane.getDividers().get(1).positionProperty().addListener((observable, oldValue, newValue) ->
+          rememberDependencyWidth(newValue.doubleValue())
+        );
+      }
+      myDependencyNavigator.refresh();
+    } else if (isVisible) {
+      double tableDivider = splitPane.getDividerPositions()[0];
+      splitPane.getItems().remove(2);
+      Platform.runLater(() -> splitPane.setDividerPosition(0, tableDivider));
+    }
+  }
+
+  /**
+   * Saves the width the user dragged the panel to. Positions which the code itself set, and the
+   * degenerate ones which show up while the panel is being inserted, are not the user's choice.
+   */
+  private void rememberDependencyWidth(double dividerPosition) {
+    if (isApplyingDependencyDivider || myViewComponents == null) {
+      return;
+    }
+    var splitPane = myViewComponents.getSplitPane();
+    if (splitPane.getItems().size() < 3 || splitPane.getWidth() <= 0.0) {
+      return;
+    }
+    double width = (1.0 - dividerPosition) * splitPane.getWidth();
+    if (width >= MIN_DEPENDENCY_PANE_WIDTH && width <= maxDependencyPaneWidth(splitPane.getWidth())) {
+      myDependencyWidthOption.setValue(width, GanttChartTabContentPanel.this);
+    }
+  }
+
+  /**
+   * Gives the panel its stored width in pixels, taking the space from the chart. Pass a divider
+   * position to put the task table back where it was, or a negative value to leave it alone.
+   */
+  private void applyDependencyWidth(double tableDivider) {
+    var splitPane = myViewComponents.getSplitPane();
+    Runnable apply = () -> {
+      if (splitPane.getItems().size() < 3 || splitPane.getWidth() <= 0.0) {
+        return;
+      }
+      double paneWidth = Math.max(MIN_DEPENDENCY_PANE_WIDTH,
+          Math.min(myDependencyWidthOption.getValue(), maxDependencyPaneWidth(splitPane.getWidth())));
+      double panelDivider = (splitPane.getWidth() - paneWidth) / splitPane.getWidth();
+      isApplyingDependencyDivider = true;
+      if (tableDivider >= 0.0) {
+        splitPane.setDividerPositions(tableDivider, panelDivider);
+      } else {
+        splitPane.setDividerPosition(1, panelDivider);
+      }
+      Platform.runLater(() -> isApplyingDependencyDivider = false);
+    };
+    if (splitPane.getWidth() != 0.0) {
+      Platform.runLater(apply);
+    } else {
+      splitPane.widthProperty().addListener(new ChangeListener<>() {
+        @Override
+        public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+          if (oldValue.doubleValue() == 0.0 && newValue.doubleValue() != 0.0) {
+            splitPane.widthProperty().removeListener(this);
+            Platform.runLater(apply);
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * The dependency panel state goes into the application options rather than into the view
+   * options: what a view writes into the project file is never read back, see
+   * ViewSerializer.loadView.
+   */
+  @NotNull
+  GPOptionGroup getOptionGroups() {
+    return myDependencyOptionGroup;
+  }
+
+  @NotNull
+  BooleanOption getDependencyPaneOption() {
+    return myDependencyPaneOption;
   }
 
   private @NotNull Unit buildContextMenu(@NotNull MenuBuilder menuBuilder) {
