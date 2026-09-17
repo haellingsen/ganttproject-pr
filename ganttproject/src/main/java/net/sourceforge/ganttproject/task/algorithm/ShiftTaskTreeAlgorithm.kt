@@ -47,6 +47,10 @@ class ShiftTaskTreeAlgorithm(private val taskManager: TaskManager, private val t
     }
   }
 
+  fun setIsolationLevel(level: Int) {
+    task2mutator.values.forEach { it.setIsolationLevel(level) }
+  }
+
   fun commit() {
     task2mutator.values.forEach { it.commit() }
     try {

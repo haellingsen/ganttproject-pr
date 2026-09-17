@@ -107,7 +107,10 @@ object BuiltInFilters {
  */
 class TaskFilterManager(private val taskManager: TaskManager, private val projectDatabase: ProjectDatabase) {
   // This is a set of task IDs that are retained by the current active filter.
-  private val filterResults: MutableSet<Int> = mutableSetOf()
+  // Replaced atomically by refreshCustomFilterResults(); reads happen on the JavaFX thread while the
+  // undo transaction commits on the Swing thread, so this must never be mutated in place.
+  @Volatile
+  private var filterResults: Set<Int> = emptySet()
   private val hasUpdatesInTxn = AtomicBoolean(false)
 
   val filterFxn: TaskFilterFxn = { _, child ->
@@ -115,8 +118,9 @@ class TaskFilterManager(private val taskManager: TaskManager, private val projec
       refreshCustomFilterResults()
       hasUpdatesInTxn.set(false)
     }
-    (child?.taskID?.let { filterResults.contains(it) } != false).also {
-      if (it) LOGGER.debug("Custom filter returned true for task $child. currently filtered tasks: $filterResults")
+    val results = filterResults
+    (child?.taskID?.let { results.contains(it) } != false).also {
+      if (it && LOGGER.delegate().isDebugEnabled) LOGGER.debug("Custom filter returned true for task {}. currently filtered tasks: {}", child, results)
     }
   }
 
@@ -195,7 +199,6 @@ class TaskFilterManager(private val taskManager: TaskManager, private val projec
 
   private fun refreshCustomFilterResults() {
     LOGGER.debug(">>> refresh()")
-    filterResults.clear()
 
     val retainedTasks = mutableListOf<Task>()
     if (!activeFilter.isBuiltIn) {
@@ -236,8 +239,7 @@ class TaskFilterManager(private val taskManager: TaskManager, private val projec
     }
     LOGGER.debug("<<< refresh()")
 
-    filterResults.clear()
-    filterResults.addAll(retainedTaskNums)
+    filterResults = retainedTaskNums.toSet()
   }
   internal var sync: ()->Unit = {}
 

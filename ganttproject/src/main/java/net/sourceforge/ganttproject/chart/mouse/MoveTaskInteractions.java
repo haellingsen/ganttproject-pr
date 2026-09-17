@@ -22,6 +22,7 @@ import biz.ganttproject.core.time.TimeDuration;
 import net.sourceforge.ganttproject.gui.UIFacade;
 import net.sourceforge.ganttproject.task.ShiftMutator;
 import net.sourceforge.ganttproject.task.Task;
+import net.sourceforge.ganttproject.task.TaskMutator;
 import net.sourceforge.ganttproject.task.algorithm.RecalculateTaskScheduleAlgorithm;
 import net.sourceforge.ganttproject.task.dependency.TaskDependencyException;
 
@@ -67,9 +68,11 @@ public class MoveTaskInteractions extends MouseInteractionBase implements MouseI
   public void finish() {
     if (getState() == RUNNING) {
       setState(FINISHING);
-//      for (TaskMutator mutator : myMutators) {
-//        mutator.setIsolationLevel(TaskMutator.READ_COMMITED);
-//      }
+      // Hide the uncommitted shift from the task getters before the undo manager takes its
+      // "before" snapshot; otherwise undo restores the already-moved dates and appears to do nothing.
+      for (var mutator : myMutators) {
+        mutator.setIsolationLevel(TaskMutator.READ_COMMITED);
+      }
       myUiFacade.getUndoManager().undoableEdit("Task moved", new Runnable() {
         @Override
         public void run() {
