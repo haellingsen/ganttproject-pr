@@ -8,3 +8,12 @@ ganttproject-builder/dist-win
 ganttproject-builder/dist-bin
 ganttproject-builder/runtime
 **/*.css.map
+# --- Lokalt utviklingsoppsett (Pioneer Robotics-fork) ---
+# CSS genereres fra src/main/sass av io.miret.etienne.sass-plugin
+ganttproject/src/main/resources/biz/
+ganttproject/src/main/resources/com/sandec/mdfx/*.css
+# Kopieres inn av biz.ganttproject.app.libs under bygg
+ganttproject-builder/lib/slf4j*.jar
+ganttproject-builder/lib/logback*.jar
+# Kjoerelogger fra appen
+*.log
