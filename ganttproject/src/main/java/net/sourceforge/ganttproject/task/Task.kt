@@ -24,4 +24,10 @@ interface ShiftMutator {
   val task: Task
   fun shift(interval: TimeDuration)
   fun commit()
+  /**
+   * Sets the isolation level of all underlying task mutators. Interactions switch to
+   * TaskMutator.READ_COMMITED before starting an undoable edit, so that the "before" snapshot
+   * taken by the undo manager does not already contain the uncommitted changes.
+   */
+  fun setIsolationLevel(level: Int)
 }

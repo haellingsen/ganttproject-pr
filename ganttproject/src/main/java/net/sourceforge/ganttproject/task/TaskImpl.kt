@@ -383,4 +383,8 @@ internal class ShiftMutatorImpl(taskImpl: TaskImpl): ShiftMutator {
   override fun commit() {
     shiftAlgorithm.commit()
   }
+
+  override fun setIsolationLevel(level: Int) {
+    shiftAlgorithm.setIsolationLevel(level)
+  }
 }
