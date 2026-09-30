@@ -49,6 +49,7 @@ import net.sourceforge.ganttproject.task.TaskSelectionManager
 import net.sourceforge.ganttproject.task.dependency.TaskDependency
 import net.sourceforge.ganttproject.task.dependency.TaskDependencyException
 import net.sourceforge.ganttproject.task.event.TaskListenerAdapter
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * A panel which lists the dependencies of the selected task: the tasks it waits for and the tasks
@@ -106,7 +107,7 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
       override fun selectionChanged(currentSelection: MutableList<Task>?, source: Any?) {
         // Do not fight with the selection which this panel has just made.
         if (source !== this@DependencyNavigator) {
-          FXUtil.runLater { refresh() }
+          scheduleRefresh()
         }
       }
 
@@ -141,9 +142,24 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
   private fun listenTo(manager: TaskManager) {
     if (listenedManager === manager) return
     listenedManager = manager
-    manager.addTaskListener(TaskListenerAdapter {
-      if (node.scene != null) FXUtil.runLater { refresh() }
-    })
+    manager.addTaskListener(TaskListenerAdapter { scheduleRefresh() })
+  }
+
+  /** Set while a refresh is queued, so that a burst of events ends in one refresh. */
+  private val isRefreshPending = AtomicBoolean(false)
+
+  /**
+   * Queues one refresh on the JavaFX thread. A paste or an undo fires one event per task, dependency
+   * and schedule change, and a refresh for each of them kept the JavaFX thread busy long after the
+   * edit was done. The delay lets the burst finish first.
+   */
+  private fun scheduleRefresh() {
+    if (isRefreshPending.compareAndSet(false, true)) {
+      FXUtil.runLater(REFRESH_DELAY_MS) {
+        isRefreshPending.set(false)
+        if (node.scene != null) refresh()
+      }
+    }
   }
 
   private fun build(): Node {
@@ -380,3 +396,6 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
     return if (link.isPredecessor) "${link.task.name} → $self" else "$self → ${link.task.name}"
   }
 }
+
+/** How long the panel waits for a burst of task events to end before it refreshes. */
+private const val REFRESH_DELAY_MS = 100L
