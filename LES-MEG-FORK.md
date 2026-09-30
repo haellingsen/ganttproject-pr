@@ -5,7 +5,6 @@ Oppstrøms er `bardsoftware/ganttproject`; våre endringer ligger på egen branc
 
 | | |
 |---|---|
-| Arbeidsbranch | `feature/fx-option-pages` |
 | Versjon | 3.4.3395 |
 | Oppstrøms | `origin` = https://github.com/bardsoftware/ganttproject.git |
 | Installert app | `%USERPROFILE%\Apps\ganttproject-3.4.3395-fx` |
