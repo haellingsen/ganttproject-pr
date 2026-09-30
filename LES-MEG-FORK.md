@@ -45,12 +45,20 @@ Appen startes med `start-ganttproject-fx.bat` i samme mappe.
 ## Lage portabel pakke
 
 ```powershell
-& "$env:USERPROFILE\Apps\ganttproject-portable-build\make-portable.ps1"
+$env:JAVA_HOME = "C:\Program Files\BellSoft\LibericaJDK-21-Full"
+.\gradlew.bat clean distBin
+.\ganttproject-builder\make-portable.ps1
 ```
 
-Skriptet pakker den installerte appen sammen med et jlink-kjøremiljø
-(OpenJDK 21 + JavaFX) til `out\GanttProject-RTP`. Zip den mappa etterpå.
+Skriptet pakker `ganttproject-builder\dist-bin` sammen med jlink-kjøremiljøet
+(OpenJDK 21 + JavaFX) i `%USERPROFILE%\Apps\ganttproject-portable-build\runtime`
+til `out\GanttProject-RTP` i samme mappe. Zip den mappa etterpå.
 Pakken krever ingen Java-installasjon hos mottaker.
+
+Pakken må starte med `-Dlogback.configurationFile=$APPDIR\logback.xml`, og skriptet
+setter den. Uten den finner ikke logback konfigurasjonen, fordi jpackage bare legger
+jar-filene på classpath. Da logger alt på DEBUG til en konsoll som ikke finnes, og
+kopier/lim inn blir svært tregt.
 
 ## Merk
 
