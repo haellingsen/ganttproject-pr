@@ -56,6 +56,16 @@ Skriptet pakker `ganttproject-builder\dist-bin` sammen med jlink-kjøremiljøet
 til `out\GanttProject-PR` i samme mappe. Zip den mappa etterpå.
 Pakken krever ingen Java-installasjon hos mottaker.
 
+For én enkelt exe-fil med alt i (Java, programmet og pluginene):
+
+```powershell
+.\ganttproject-builder\single-exe\make-single-exe.ps1 -OutFile "$env:USERPROFILE\Apps\GanttProject-PR.exe"
+```
+
+Første gang exe-filen startes, pakker den ut programmet til `%LOCALAPPDATA%\GanttProject-PR\<bygg>`
+(ca. 10 sekunder). Senere starter den den utpakkede kopien direkte. En nyere exe pakker ut sin egen kopi
+og sletter de gamle. Skriptet bruker C#-kompilatoren som følger med Windows.
+
 Pakken må starte med `-Dlogback.configurationFile=$APPDIR\logback.xml`, og skriptet
 setter den. Uten den finner ikke logback konfigurasjonen, fordi jpackage bare legger
 jar-filene på classpath. Da logger alt på DEBUG til en konsoll som ikke finnes, og
