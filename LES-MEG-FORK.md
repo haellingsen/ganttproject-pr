@@ -1,4 +1,4 @@
-# GanttProject – Pioneer Robotics-fork
+# GanttProject – PR fork
 
 Dette er **hovedmappa for utvikling** av vår GanttProject-variant.
 Oppstrøms er `bardsoftware/ganttproject`; våre endringer ligger på egen branch.
