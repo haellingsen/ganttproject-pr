@@ -98,7 +98,6 @@ class OptionPaneBuilder<T> {
           enableCustomNode(index)
         }
       }
-      this.selectedElement = this.elements.firstOrNull()
       vbox.add(btn)
 
       if (this.i18n.formatTextOrNull("${element.i18nKey}.help") != null) {
@@ -108,8 +107,10 @@ class OptionPaneBuilder<T> {
         })
       }
       customNodes[index]?.let(vbox::add)
-      enableCustomNode(0)
     }
+    val selectedIndex = this.elements.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+    this.selectedElement = this.elements.getOrNull(selectedIndex)
+    if (customNodes.isNotEmpty()) enableCustomNode(selectedIndex)
     return vbox.vbox
   }
 

@@ -36,6 +36,7 @@ import net.sourceforge.ganttproject.IGanttProject
 import net.sourceforge.ganttproject.gui.FileChooserPageBase
 import net.sourceforge.ganttproject.gui.UIUtil
 import net.sourceforge.ganttproject.gui.options.OptionsPageBuilder
+import net.sourceforge.ganttproject.util.FileUtil.appendExtension
 import net.sourceforge.ganttproject.util.FileUtil.replaceExtension
 import org.osgi.service.prefs.Preferences
 import java.io.File
@@ -70,11 +71,14 @@ internal class ExportFileChooserPage(
       myState.exporter?.let {proposeOutputFile(myProject, it) } ?: File(defaultFileName)
     }
     fxFile.addWatcher {
-      myState.file = it.newValue
+      myState.file = withExportExtension(it.newValue, myState.exporter)
     }
   }
 
-  override fun validateFile(file: File?): Result<File, String> {
+  override fun validateFile(chosenFile: File?): Result<File, String> {
+    // Validate the file which will actually be written, so that the overwrite check sees "name.svg", not "name"
+    val file = withExportExtension(chosenFile, myState.exporter)
+    myState.file = file
     if (file == null) {
       return Err("File cannot be null")
     }
@@ -147,6 +151,17 @@ internal class ExportFileChooserPage(
   override val optionGroups: List<GPOptionGroup>
     get() = listOf(myWebPublishingGroup) + (myState.exporter?.secondaryOptions ?: emptyList())
 
+}
+
+/**
+ * Appends the exporter's file extension when the user typed a file name without one
+ * (or with an extension the exporter does not produce).
+ */
+internal fun withExportExtension(file: File?, exporter: Exporter?): File? {
+  if (file == null || exporter == null || file.isDirectory) return file
+  val extension = file.extension
+  return if (extension.isNotEmpty() && exporter.fileExtensions.any { it.equals(extension, ignoreCase = true) }) file
+    else appendExtension(file, exporter.proposeFileExtension())
 }
 
 fun proposeOutputFile(project: IGanttProject, exporter: Exporter): File? {
