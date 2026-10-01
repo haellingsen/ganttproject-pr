@@ -27,6 +27,7 @@
             point="net.sourceforge.ganttproject.exporter">
         <exporter class="org.ganttproject.impex.htmlpdf.ExporterToHTML"/>
         <exporter class="org.ganttproject.impex.htmlpdf.ExporterToPDF"/>
+        <exporter class="org.ganttproject.impex.htmlpdf.overview.ExporterToOverview"/>
     </extension>
     <extension point="org.ganttproject.impex.htmlpdf.HTMLStylesheet">
         <theme name="Samara" url="html-export-themes/samara/"/>

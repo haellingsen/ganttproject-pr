@@ -16,6 +16,8 @@ Oppstrøms er `bardsoftware/ganttproject`; våre endringer ligger på egen branc
 - Innstillingssider migrert til JavaFX
 - Disposisjonsnivåer (Alt+1..9), sentrert zoom, klikkbart PERT-diagram
 - Rettelser: ny/slett oppgave, og angre etter Ctrl+dra i Gantt-diagrammet
+- **Oversiktsdiagram (PDF/SVG)**: enkel rapport på én side, standardvalget øverst i Prosjekt → Eksporter. Se [brukerveiledningen](docs/oversiktseksport.md)
+- Eksport legger til filendelsen hvis du ikke skriver den
 
 ## Bygge
 

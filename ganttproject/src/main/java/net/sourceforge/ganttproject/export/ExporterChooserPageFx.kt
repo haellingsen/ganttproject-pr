@@ -20,6 +20,11 @@ package net.sourceforge.ganttproject.export
 
 import biz.ganttproject.app.*
 import javafx.scene.Node
+import javafx.geometry.Pos
+import javafx.scene.control.ScrollPane
+import javafx.scene.layout.StackPane
+import javafx.scene.layout.VBox
+import javafx.stage.Screen
 import biz.ganttproject.app.WizardPage
 import java.awt.Component
 
@@ -39,23 +44,33 @@ class ExporterChooserPageFx(exporters: List<Exporter>, private val model: Export
     this.i18n = MappingLocalizer(titles, DummyLocalizer::create)
     this.styleClass = "exporter-chooser-page"
     elements = exporters.mapIndexed { index, exporter ->
-      OptionElementData("title.${index}", exporter, isSelected = (index == 0),
+      OptionElementData("title.${index}", exporter, isSelected = (exporter == (model.exporter ?: exporters.first())),
         customContent = buildCustomContent(exporter))
     }
     onSelect = { model.exporter = it }
   }
   override val fxComponent: Node? by lazy {
-    optionPaneBuilder.buildPane()
+    // The list of exporters with their options and previews can be taller than a small screen.
+    // Scroll it, so that the wizard buttons always stay visible.
+    ScrollPane(optionPaneBuilder.buildPane()).apply {
+      isFitToWidth = true
+      hbarPolicy = ScrollPane.ScrollBarPolicy.NEVER
+      maxHeight = Screen.getPrimary().visualBounds.height * MAX_SCREEN_SHARE
+      style = "-fx-background-color: transparent; -fx-background-insets: 0; -fx-padding: 0;"
+      StackPane.setAlignment(this, Pos.TOP_CENTER)
+    }
   }
 
   private fun buildCustomContent(exporter: Exporter): Node? {
-    return if (exporter.options.options.isEmpty()) null
+    val optionsPane = if (exporter.options.options.isEmpty()) null
     else
     properties(propertyLocalizer) {
       exporter.options.options.forEach {
         it.visitPropertyPaneBuilder(this)
       }
     }
+    val preview = exporter.createPreviewFx() ?: return optionsPane
+    return if (optionsPane == null) preview else VBox(optionsPane, preview)
   }
 
   override fun setActive(b: Boolean) {
@@ -66,6 +81,8 @@ class ExporterChooserPageFx(exporters: List<Exporter>, private val model: Export
     }
   }
 }
+
+private const val MAX_SCREEN_SHARE = 0.6
 
 private val propertyLocalizer = i18n {
   default()

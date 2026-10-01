@@ -31,6 +31,9 @@
             <run class="net.sourceforge.ganttproject.application.MainApplication"/>
         </application>
     </extension>
+    <extension point="net.sourceforge.ganttproject.l10n">
+        <bundle path="translations-fork"/>
+    </extension>
     <extension point="net.sourceforge.ganttproject.exporter">
         <exporter class="net.sourceforge.ganttproject.export.ExporterToImage"/>
         <exporter class="net.sourceforge.ganttproject.export.ExporterToCSV"/>

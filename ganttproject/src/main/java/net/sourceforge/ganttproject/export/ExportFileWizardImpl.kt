@@ -166,7 +166,7 @@ class ExportFileWizardImpl(
 }
 
 private fun findExporters(): MutableList<Exporter> {
-  return PluginManager.getExporters()
+  return PluginManager.getExporters().sortedBy { it.chooserOrder }.toMutableList()
 }
 
 // The last exporter that was selected by the user. Used to recover the first page state when the wizard is reopened.

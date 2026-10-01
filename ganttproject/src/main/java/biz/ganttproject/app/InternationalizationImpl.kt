@@ -68,7 +68,7 @@ private val cachedFileNames by lazy {
   } ?: listOf()
 }
 
-internal fun getTranslationFileNames(): List<String> = cachedFileNames.map { it.name }
+internal fun getTranslationFileNames(): List<String> = cachedFileNames.map { it.name }.distinct()
 
 
 internal fun createTranslation(locale: Locale, resourceBundle: ResourceBundle) =
@@ -83,13 +83,21 @@ val defaultTranslation by lazy {
   }
 }
 
+/**
+ * Several plugins may contribute a file with the same name (e.g. a fork adds its own strings next to the
+ * standard translations). The files are merged; when a key is defined twice, the first file wins.
+ */
 internal fun createTranslationFromFile(locale: Locale, fileName: String): Translation? {
-  return cachedFileNames.find { it.name == fileName }?.let {
-    val properties = Properties()
-    properties.load(it.reader(Charsets.UTF_8))
-    Translation(locale) {
-      properties.getProperty(it, null)
+  val files = cachedFileNames.filter { it.name == fileName }
+  if (files.isEmpty()) return null
+  val properties = Properties()
+  files.forEach { file ->
+    Properties().also { p -> file.reader(Charsets.UTF_8).use { p.load(it) } }.forEach { (key, value) ->
+      properties.putIfAbsent(key, value)
     }
+  }
+  return Translation(locale) {
+    properties.getProperty(it, null)
   }
 }
 

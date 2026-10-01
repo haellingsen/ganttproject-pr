@@ -11,7 +11,11 @@ dependencies {
     providedCompile project(path: ':biz.ganttproject.core')
     providedCompile project(path: ':ganttproject')
     implementation group: 'com.itextpdf', name: 'itextpdf', version: '5.+'
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.+'
+    testImplementation 'org.junit.platform:junit-platform-launcher:1.13.2'
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.13.2'
 }
+
 
 task copyPlugin(dependsOn: jar) {
     install(copyPlugin, jar, project)

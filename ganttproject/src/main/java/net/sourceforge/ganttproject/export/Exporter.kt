@@ -20,6 +20,7 @@ package net.sourceforge.ganttproject.export
 
 import biz.ganttproject.app.JobMonitorModel
 import biz.ganttproject.core.option.GPOptionGroup
+import javafx.scene.Node
 import javafx.scene.Parent
 import kotlinx.coroutines.CoroutineScope
 import net.sourceforge.ganttproject.IGanttProject
@@ -56,4 +57,10 @@ interface Exporter {
     val customOptionsUI: Component?
 
   fun createCustomOptionsUiFx(): Parent? { return null }
+
+  /** Position in the export wizard, lower values come first. */
+  val chooserOrder: Int get() = 0
+
+  /** Optional example of the result, shown under the options on the exporter chooser page. */
+  fun createPreviewFx(): Node? { return null }
 }
