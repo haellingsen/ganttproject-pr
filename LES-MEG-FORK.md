@@ -12,7 +12,7 @@ Oppstrøms er `bardsoftware/ganttproject`; våre endringer ligger på egen branc
 
 ## Våre tillegg
 
-- Dokkbart **avhengighetspanel** i Gantt-fanen (Vis → Task dependencies). Endre koblingstype (FS, SS, FF, SF), forsinkelse eller forsering i dager, og hard/rubber for den markerte avhengigheten
+- Dokkbart **avhengighetspanel** i Gantt-fanen (Vis → Task dependencies). Koblingstype (FS, SS, FF, SF), forsinkelse eller forsering i dager, og hard/rubber endres rett i tabellen
 - Innstillingssider migrert til JavaFX
 - Disposisjonsnivåer (Alt+1..9), sentrert zoom, klikkbart PERT-diagram
 - Rettelser: ny/slett oppgave, og angre etter Ctrl+dra i Gantt-diagrammet

@@ -32,13 +32,13 @@ import javafx.scene.control.Label
 import javafx.scene.control.ListCell
 import javafx.scene.control.ListView
 import javafx.scene.control.SelectionMode
-import javafx.scene.control.Spinner
 import javafx.scene.control.TableCell
 import javafx.scene.control.TableColumn
 import javafx.scene.control.TableRow
 import javafx.scene.control.TableView
 import javafx.scene.control.TextField
 import javafx.scene.control.Tooltip
+import javafx.scene.control.cell.TextFieldTableCell
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
 import javafx.scene.layout.HBox
@@ -67,9 +67,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * It also edits the list. Delete removes the highlighted dependency, and the search field at the
  * bottom finds another task by id or name and links it as a predecessor (Enter) or a successor
- * (Shift+Enter). The row under the table changes the highlighted dependency: the link type
+ * (Shift+Enter). The Link, Lag and Type cells are edited in place with a single click: the link type
  * (finish-start, start-start, finish-finish, start-finish), the lag in days (negative for a lead)
- * and whether it is hard or rubber. All edits go through the undo manager.
+ * and whether the dependency is hard or rubber. All edits go through the undo manager.
  *
  * It is docked at the right hand side of the Gantt view; [node] is what the view embeds. The panel
  * follows the selection on its own, so the view only has to decide whether it is on screen.
@@ -107,35 +107,6 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
     it.tooltip = Tooltip("Expand the tree so that every task in this list has a bar in the chart")
   }
 
-  private val linkTypeBox = ComboBox(FXCollections.observableArrayList(LinkType.entries)).also {
-    it.converter = object : StringConverter<LinkType>() {
-      override fun toString(type: LinkType?) = type?.let { t -> "${t.name}  ${t.label}" } ?: ""
-      override fun fromString(text: String?) = LinkType.entries.find { t -> text?.startsWith(t.name) == true }
-    }
-    it.tooltip = Tooltip("Which dates are linked: Finish-Start, Start-Start, Finish-Finish or Start-Finish")
-  }
-  private val lagSpinner = Spinner<Int>(-MAX_LAG_DAYS, MAX_LAG_DAYS, 0).also {
-    it.isEditable = true
-    it.prefWidth = 80.0
-    it.tooltip = Tooltip("Lag in days between the linked dates. A negative value is a lead: the tasks overlap")
-  }
-  private val hardnessBox = ComboBox(FXCollections.observableArrayList(TaskDependency.Hardness.STRONG, TaskDependency.Hardness.RUBBER)).also {
-    it.converter = object : StringConverter<TaskDependency.Hardness>() {
-      override fun toString(hardness: TaskDependency.Hardness?) = hardness?.let(::hardnessText) ?: ""
-      override fun fromString(text: String?) = if (text == "rubber") TaskDependency.Hardness.RUBBER else TaskDependency.Hardness.STRONG
-    }
-    it.tooltip = Tooltip("Hard keeps the exact lag. Rubber only sets the earliest date, the task may start later")
-  }
-
-  /** Set while the editor row shows a dependency, so that filling in the controls is not taken for an edit. */
-  private var isShowingInEditor = false
-
-  /**
-   * Set while [refresh] replaces the rows. The selection is empty for a moment then, and disabling the editor
-   * row would take the focus away from the lag field in the middle of an edit.
-   */
-  private var isRefreshing = false
-
   /** The task manager we listen to, so that the list follows undo and edits made in the chart. */
   private var listenedManager: TaskManager? = null
 
@@ -165,24 +136,17 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
     if (task == null) {
       header.text = if (selection.isEmpty()) "No task selected" else "${selection.size} tasks selected"
       links.clear()
-      showInEditor(null)
       updateCandidates(null)
       return
     }
     listenTo(task.manager)
     val previouslySelected = table.selectionModel.selectedItem?.dependency
     header.text = "${task.taskID}  ${task.name}"
-    isRefreshing = true
-    try {
-      links.setAll(collectLinks(task))
-      val keep = links.indexOfFirst { it.dependency === previouslySelected }
-      if (links.isNotEmpty()) {
-        table.selectionModel.select(if (keep >= 0) keep else 0)
-      }
-    } finally {
-      isRefreshing = false
+    links.setAll(collectLinks(task))
+    val keep = links.indexOfFirst { it.dependency === previouslySelected }
+    if (links.isNotEmpty()) {
+      table.selectionModel.select(if (keep >= 0) keep else 0)
     }
-    showInEditor(table.selectionModel.selectedItem)
     updateCandidates(searchField.text)
   }
 
@@ -204,7 +168,12 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
     if (isRefreshPending.compareAndSet(false, true)) {
       FXUtil.runLater(REFRESH_DELAY_MS) {
         isRefreshPending.set(false)
-        if (node.scene != null) refresh()
+        when {
+          node.scene == null -> {}
+          // Replacing the rows would throw away the cell the user is typing in. Try again later.
+          table.editingCell != null -> scheduleRefresh()
+          else -> refresh()
+        }
       }
     }
   }
@@ -241,29 +210,67 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
       column.setCellValueFactory { SimpleStringProperty(it.value.parentName) }
       column.prefWidth = 120.0
     }
-    val linkColumn = TableColumn<Link, String>("Link").also { column ->
-      column.setCellValueFactory { SimpleStringProperty(LinkType.of(it.value.dependency.constraint).name) }
-      column.prefWidth = 42.0
-    }
-    val lagColumn = TableColumn<Link, String>("Lag").also { column ->
-      column.setCellValueFactory { SimpleStringProperty(lagText(it.value.dependency.difference)) }
+    val linkColumn = TableColumn<Link, LinkType>().also { column ->
+      column.graphic = headerLabel("Link", "Which dates are linked: Finish-Start, Start-Start, Finish-Finish or Start-Finish. Click to change")
+      column.setCellValueFactory { SimpleObjectProperty(LinkType.of(it.value.dependency.constraint)) }
+      column.setCellFactory { ChoiceTableCell(LinkType.entries) { type -> type.name } }
+      column.setOnEditCommit { e ->
+        val type = e.newValue ?: return@setOnEditCommit
+        if (type != e.oldValue) editLink(e.rowValue, "Change dependency type") { it.constraint = type.create() }
+      }
       column.prefWidth = 48.0
     }
-    val typeColumn = TableColumn<Link, String>("Type").also { column ->
-      column.setCellValueFactory { SimpleStringProperty(hardnessText(it.value.dependency.hardness)) }
-      column.prefWidth = 60.0
+    val lagColumn = TableColumn<Link, Int>().also { column ->
+      column.graphic = headerLabel("Lag", "Lag in days between the linked dates. A negative value is a lead: the tasks overlap. Click to change")
+      column.setCellValueFactory { SimpleObjectProperty(it.value.dependency.difference) }
+      column.setCellFactory {
+        object : TextFieldTableCell<Link, Int>(LagConverter) {
+          init {
+            startEditOnClick(this)
+          }
+        }
+      }
+      column.setOnEditCommit { e ->
+        // An unreadable value comes as null: keep the old lag.
+        val lag = e.newValue
+        if (lag == null || lag == e.oldValue) {
+          table.refresh()
+          return@setOnEditCommit
+        }
+        editLink(e.rowValue, "Change dependency lag") { it.difference = lag }
+      }
+      column.prefWidth = 52.0
     }
+    val typeColumn = TableColumn<Link, TaskDependency.Hardness>().also { column ->
+      column.graphic = headerLabel("Type", "Hard keeps the exact lag. Rubber only sets the earliest date, the task may start later. Click to change")
+      column.setCellValueFactory { SimpleObjectProperty(it.value.dependency.hardness) }
+      column.setCellFactory { ChoiceTableCell(listOf(TaskDependency.Hardness.STRONG, TaskDependency.Hardness.RUBBER), ::hardnessText) }
+      column.setOnEditCommit { e ->
+        val hardness = e.newValue ?: return@setOnEditCommit
+        if (hardness != e.oldValue) editLink(e.rowValue, "Change dependency hardness") {
+          it.hardness = hardness
+          // Hardness does not fire a dependency event, so the schedule is not updated by itself.
+          it.dependant.manager.algorithmCollection.scheduler.run()
+        }
+      }
+      column.prefWidth = 66.0
+    }
+    listOf(directionColumn, idColumn, nameColumn, parentColumn).forEach { it.isEditable = false }
     table.columns.setAll(directionColumn, idColumn, parentColumn, nameColumn, linkColumn, lagColumn, typeColumn)
+    table.isEditable = true
     table.selectionModel.selectionMode = SelectionMode.SINGLE
     table.placeholder = Label("No dependencies")
     // Only a double click on a row jumps. Listening on the whole table also caught double clicks on
     // the column headers, so resizing a column to fit sent the user off to the highlighted task.
+    // A click in an editable cell starts editing instead, so a double click there does not jump.
     table.setRowFactory {
       TableRow<Link>().also { row ->
-        row.setOnMouseClicked { if (it.clickCount == 2 && !row.isEmpty) jumpToSelected() }
+        row.setOnMouseClicked { if (it.clickCount == 2 && !row.isEmpty && table.editingCell == null) jumpToSelected() }
       }
     }
     table.setOnKeyPressed {
+      // Keys typed into a cell editor are not commands for the table.
+      if (table.editingCell != null) return@setOnKeyPressed
       when (it.code) {
         KeyCode.ENTER -> jumpToSelected()
         KeyCode.DELETE, KeyCode.BACK_SPACE -> removeSelected()
@@ -271,24 +278,6 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
       }
       it.consume()
     }
-    table.selectionModel.selectedItemProperty().addListener { _, _, link -> if (!isRefreshing) showInEditor(link) }
-    linkTypeBox.valueProperty().addListener { _, _, type ->
-      if (type != null) editSelected("Change dependency type") { it.constraint = type.create() }
-    }
-    lagSpinner.valueProperty().addListener { _, _, lag ->
-      if (lag != null) editSelected("Change dependency lag") { it.difference = lag }
-    }
-    // A typed value is only committed on Enter. Leaving the field should keep it too.
-    lagSpinner.focusedProperty().addListener { _, _, focused -> if (!focused) commitLagText() }
-    hardnessBox.valueProperty().addListener { _, _, hardness ->
-      if (hardness != null) editSelected("Change dependency hardness") {
-        it.hardness = hardness
-        // Hardness does not fire a dependency event, so the schedule is not updated by itself.
-        it.dependant.manager.algorithmCollection.scheduler.run()
-      }
-    }
-    showInEditor(null)
-
     removeButton.setOnAction { removeSelected() }
     removeButton.disableProperty().bind(table.selectionModel.selectedItemProperty().isNull)
     revealButton.setOnAction { revealAll() }
@@ -315,9 +304,6 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
     addBeforeButton.disableProperty().bind(noCandidate)
     addAfterButton.disableProperty().bind(noCandidate)
 
-    val editRow = HBox(6.0, Label("Link"), linkTypeBox, Label("Lag"), lagSpinner, Label("days"), hardnessBox).also {
-      it.alignment = Pos.CENTER_LEFT
-    }
     val removeRow = HBox(6.0, status, revealButton, removeButton).also {
       it.alignment = Pos.CENTER_LEFT
       HBox.setHgrow(status, Priority.ALWAYS)
@@ -330,7 +316,7 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
     val addRow = HBox(6.0, searchField, addBeforeButton, addAfterButton).also {
       HBox.setHgrow(searchField, Priority.ALWAYS)
     }
-    return VBox(header, table, editRow, removeRow, addRow, candidateView).also {
+    return VBox(header, table, removeRow, addRow, candidateView).also {
       it.spacing = 4.0
       it.padding = Insets(6.0)
       it.styleClass.add("dependency-navigator")
@@ -341,49 +327,14 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
     }
   }
 
-  /** Fills the editor row with the highlighted dependency, or disables it when there is none. */
-  private fun showInEditor(link: Link?) {
-    isShowingInEditor = true
-    try {
-      val disabled = link == null
-      linkTypeBox.isDisable = disabled
-      lagSpinner.isDisable = disabled
-      hardnessBox.isDisable = disabled
-      if (link != null) {
-        linkTypeBox.value = LinkType.of(link.dependency.constraint)
-        lagSpinner.valueFactory.value = link.dependency.difference
-        // Keep the text in step with the value, so that a later commit of the text cannot bring back an old lag.
-        lagSpinner.editor.text = link.dependency.difference.toString()
-        hardnessBox.value = link.dependency.hardness
-      }
-    } finally {
-      isShowingInEditor = false
-    }
-  }
-
-  /** Applies [change] to the highlighted dependency as one undoable edit. The scheduler then moves the tasks. */
-  private fun editSelected(name: String, change: (TaskDependency) -> Unit) {
-    if (isShowingInEditor) return
-    val link = table.selectionModel.selectedItem ?: return
+  /** Applies [change] to the dependency of [link] as one undoable edit. The scheduler then moves the tasks. */
+  private fun editLink(link: Link, name: String, change: (TaskDependency) -> Unit) {
     val dependency = link.dependency
-    if (LinkType.of(dependency.constraint) == linkTypeBox.value && dependency.difference == lagSpinner.value &&
-      dependency.hardness == hardnessBox.value) return
     uiFacade.undoManager.undoableEdit(name) { change(dependency) }
     status.text = listOf(arrowText(link) + ":", LinkType.of(dependency.constraint).name,
       lagText(dependency.difference), hardnessText(dependency.hardness)).filter { it.isNotEmpty() }.joinToString(" ")
     uiFacade.taskSelectionManager.fireSelectionChanged()
     refresh()
-  }
-
-  private fun commitLagText() {
-    val text = lagSpinner.editor.text?.trim()?.removePrefix("+") ?: return
-    if (text == lagSpinner.value?.toString()) return
-    val value = text.toIntOrNull()?.coerceIn(-MAX_LAG_DAYS, MAX_LAG_DAYS)
-    if (value == null) {
-      lagSpinner.editor.text = lagSpinner.value.toString()
-    } else {
-      lagSpinner.valueFactory.value = value
-    }
   }
 
   private fun collectLinks(task: Task): List<Link> {
@@ -523,6 +474,71 @@ class DependencyNavigator(private val uiFacade: UIFacade, private val revealTask
 private const val REFRESH_DELAY_MS = 100L
 
 private const val MAX_LAG_DAYS = 9999
+
+private fun headerLabel(text: String, help: String) = Label(text).also { it.tooltip = Tooltip(help) }
+
+/** Makes a single click on a filled cell start editing, so the user does not need to select the row first. */
+private fun startEditOnClick(cell: TableCell<*, *>) {
+  cell.setOnMouseClicked {
+    if (it.clickCount == 1 && !cell.isEmpty && !cell.isEditing) {
+      @Suppress("UNCHECKED_CAST")
+      (cell.tableView as TableView<Any?>).edit(cell.index, cell.tableColumn as TableColumn<Any?, *>)
+    }
+  }
+}
+
+/** Shows "+2" or "-1" and reads what the user typed. Unreadable text gives null, which keeps the old lag. */
+private object LagConverter : StringConverter<Int>() {
+  override fun toString(days: Int?) = days?.let(::lagText) ?: ""
+  override fun fromString(text: String?): Int? {
+    val trimmed = text?.trim()?.removePrefix("+").orEmpty()
+    return if (trimmed.isEmpty()) 0 else trimmed.toIntOrNull()?.coerceIn(-MAX_LAG_DAYS, MAX_LAG_DAYS)
+  }
+}
+
+/**
+ * A cell which shows a value as text and, when edited, a drop-down with the choices. The drop-down opens at once,
+ * so one click on the cell and one on the choice is all it takes.
+ */
+private class ChoiceTableCell<S, T>(private val choices: List<T>, private val label: (T) -> String) : TableCell<S, T>() {
+  init {
+    startEditOnClick(this)
+  }
+
+  override fun startEdit() {
+    super.startEdit()
+    if (!isEditing) return
+    val comboBox = ComboBox(FXCollections.observableArrayList(choices)).also { box ->
+      box.converter = object : StringConverter<T>() {
+        override fun toString(value: T?) = value?.let(label) ?: ""
+        override fun fromString(value: String?) = choices.find { label(it) == value }
+      }
+      box.value = item
+      box.maxWidth = Double.MAX_VALUE
+      box.setOnAction { if (isEditing) commitEdit(box.value) }
+      // Closing the list without a new choice ends the edit.
+      box.setOnHidden { if (isEditing) cancelEdit() }
+    }
+    setText(null)
+    graphic = comboBox
+    comboBox.requestFocus()
+    comboBox.show()
+  }
+
+  override fun cancelEdit() {
+    super.cancelEdit()
+    graphic = null
+    setText(item?.let(label))
+  }
+
+  override fun updateItem(item: T?, empty: Boolean) {
+    super.updateItem(item, empty)
+    if (!isEditing) {
+      graphic = null
+      setText(if (empty || item == null) null else label(item))
+    }
+  }
+}
 
 /** The four ways to link two tasks, named by the short form used in project management tools. */
 internal enum class LinkType(val label: String, val create: () -> TaskDependencyConstraint) {
